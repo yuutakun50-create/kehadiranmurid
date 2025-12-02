@@ -2,7 +2,7 @@
 <html lang="ms">
 <head>
   <meta charset="UTF-8" />
-  <title>Rekod Kehadiran Murid SKSA Tahap 1</title>
+  <title>Rekod Kehadiran Murid SKSA</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     * { box-sizing: border-box; font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
@@ -238,7 +238,7 @@
       <img src="https://i.imgur.com/AfsVtVG.png" alt="Logo SKSA" />
     </div>
     <div class="header-text">
-      <h1>Rekod Kehadiran Harian Murid SKSA (Tahap 1)</h1>
+      <h1>Rekod Kehadiran Harian Murid SKSA</h1>
       <p>Guru hanya perlu tandakan murid <strong>tidak hadir</strong>. Sistem akan kira kehadiran automatik untuk hari tersebut.</p>
     </div>
   </div>
@@ -247,7 +247,7 @@
 <main>
   <section class="card">
     <div class="card-header">
-      <h2>📚 Rekod Kehadiran <span class="badge">Tahap 1 (2025)</span></h2>
+      <h2>📚 Rekod Kehadiran <span class="badge" id="yearBadge"></span></h2>
       <div class="date-display" id="todayDisplay">Tarikh:</div>
     </div>
 
@@ -319,6 +319,7 @@
         <button class="subtab-btn active" data-subtab="daily">Harian</button>
         <button class="subtab-btn" data-subtab="weekly">Mingguan</button>
         <button class="subtab-btn" data-subtab="monthly">Bulanan</button>
+        <button class="subtab-btn" data-subtab="yearly" id="yearlySubtabBtn" style="display:none;">Tahunan</button>
       </div>
 
       <!-- HARIAN -->
@@ -394,6 +395,31 @@
         </div>
       </div>
 
+      <!-- TAHUNAN (admin sahaja) -->
+      <div id="summaryYearlyPanel" class="subtab-panel" style="display:none;">
+        <div class="summary-header-row" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <div>
+            Ringkasan Tahunan:
+            <select id="yearlyYearSelect" style="padding:4px 10px;border-radius:999px;border:1px solid #d1d5db;background:#f9fafb;font-size:.85rem;min-width:90px;"></select>
+          </div>
+        </div>
+        <div class="summary-table-wrapper">
+          <table class="summary-table">
+            <thead>
+              <tr>
+                <th>Bil</th>
+                <th>Bulan</th>
+                <th>Kehadiran</th>
+              </tr>
+            </thead>
+            <tbody id="yearlyTableBody"></tbody>
+          </table>
+        </div>
+        <div class="summary-footer" id="yearlyInfo">
+          Tiada rekod kehadiran untuk tahun ini.
+        </div>
+      </div>
+
     </div>
 
     <!-- TAB: ADMIN -->
@@ -401,7 +427,7 @@
       <div class="summary-box">
         <div class="summary-main">
           <div><strong>Mod Admin</strong></div>
-          <div>Anda boleh tambah kelas baharu dan kemas kini senarai murid. Perubahan disimpan dalam pangkalan data.</div>
+          <div>Anda boleh tambah / padam kelas dan kemas kini senarai murid. Perubahan disimpan dalam pangkalan data.</div>
         </div>
       </div>
 
@@ -417,6 +443,7 @@
                 <th>Kod</th>
                 <th>Nama Kelas</th>
                 <th>Bil. Murid</th>
+                <th>Tindakan</th>
               </tr>
             </thead>
             <tbody id="adminClassTableBody"></tbody>
@@ -456,7 +483,7 @@
   </section>
 
   <footer>
-    SK Sri Aman · Modul Kehadiran Harian Tahap 1 (Firebase Realtime Database)
+    SK Sri Aman · Modul Kehadiran Harian Murid (Firebase Realtime Database)
   </footer>
 </main>
 
@@ -520,8 +547,10 @@
   const today = new Date();
   const todayKey = formatDateKey(today);
   const todayHuman = formatHumanDate(today);
+  const currentYear = today.getFullYear();
 
   // DOM refs
+  const yearBadge = document.getElementById('yearBadge');
   const todayDisplay = document.getElementById('todayDisplay');
   const summaryDateLink = document.getElementById('summaryDateLink');
 
@@ -556,6 +585,12 @@
   const monthlyInfo = document.getElementById('monthlyInfo');
   const btnPrintMonthly = document.getElementById('btnPrintMonthly');
 
+  // Yearly summary DOM
+  const yearlySubtabBtn = document.getElementById('yearlySubtabBtn');
+  const yearlyYearSelect = document.getElementById('yearlyYearSelect');
+  const yearlyTableBody = document.getElementById('yearlyTableBody');
+  const yearlyInfo = document.getElementById('yearlyInfo');
+
   // Admin DOM
   const adminLogoBtn = document.getElementById('adminLogoBtn');
   const adminModal = document.getElementById('adminModal');
@@ -578,6 +613,7 @@
   const adminSaveStudentsBtn = document.getElementById('adminSaveStudentsBtn');
   const adminStudentMsg = document.getElementById('adminStudentMsg');
 
+  yearBadge.textContent = "Tahun " + currentYear;
   todayDisplay.textContent = "Tarikh: " + todayHuman;
   summaryDateLink.textContent = todayHuman;
 
@@ -609,9 +645,13 @@
       document.querySelectorAll('.subtab-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       const sub = btn.dataset.subtab;
-      document.getElementById('summaryDailyPanel').style.display = sub === 'daily' ? 'block' : 'none';
-      document.getElementById('summaryWeeklyPanel').style.display = sub === 'weekly' ? 'block' : 'none';
+      document.getElementById('summaryDailyPanel').style.display   = sub === 'daily'   ? 'block' : 'none';
+      document.getElementById('summaryWeeklyPanel').style.display  = sub === 'weekly'  ? 'block' : 'none';
       document.getElementById('summaryMonthlyPanel').style.display = sub === 'monthly' ? 'block' : 'none';
+      document.getElementById('summaryYearlyPanel').style.display  = sub === 'yearly'  ? 'block' : 'none';
+      if (sub === 'yearly' && !yearlyInitialised) {
+        initYearlySummary();
+      }
     });
   });
 
@@ -636,6 +676,7 @@
       isAdmin = true;
       closeAdminModal();
       adminTabBtn.style.display = 'inline-block';
+      yearlySubtabBtn.style.display = 'inline-block';
       setStatus('Log masuk admin berjaya.', 'info');
     } else {
       adminModalError.textContent = 'Kata laluan tidak sah.';
@@ -650,14 +691,10 @@
   });
 
   // ---------- Data asas (classData, summaryConfig) ----------
-  // classData & summaryConfig datang dari database.js
-  // Kita benarkan override daripada Firebase (config/classes)
-
   function loadClassConfigFromDB() {
     return db.ref('config/classes').once('value').then(snap => {
       const val = snap.val();
       if (val && val.classData && val.summaryConfig) {
-        // Clear dan isi semula supaya rujukan kekal
         for (const key in classData) {
           if (Object.prototype.hasOwnProperty.call(classData, key)) {
             delete classData[key];
@@ -684,7 +721,6 @@
   // ---------- UI berkaitan kelas / murid ----------
 
   function populateClassDropdown() {
-    // Simpan pilihan sekarang
     const prev = classSelect.value;
     classSelect.innerHTML = '';
     const opt0 = document.createElement('option');
@@ -820,6 +856,8 @@
       loadDailySummary();
       loadWeeklySummary();
       loadMonthlySummary();
+      yearlyRaw = null; // paksa refresh ringkasan tahunan bila buka
+      yearlyInitialised = false;
     }).catch(err => {
       console.error(err);
       setStatus('Ralat semasa menyimpan kehadiran: ' + err.message, 'error');
@@ -1147,6 +1185,115 @@
     });
   }
 
+  // -------- Ringkasan tahunan --------
+  let yearlyRaw = null;
+  let yearlyYears = [];
+  let yearlyInitialised = false;
+
+  function ensureYearlyData() {
+    if (yearlyRaw) return Promise.resolve();
+    return db.ref('kehadiran').once('value').then(snap => {
+      yearlyRaw = snap.val() || {};
+      const yearSet = new Set();
+      Object.keys(yearlyRaw).forEach(k => {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(k)) {
+          yearSet.add(k.slice(0,4));
+        }
+      });
+      yearlyYears = Array.from(yearSet).sort();
+    }).catch(err => {
+      console.error(err);
+      yearlyInfo.textContent = 'Ralat memuatkan data tahunan: ' + err.message;
+    });
+  }
+
+  function populateYearlyYearOptions() {
+    yearlyYearSelect.innerHTML = '';
+    if (!yearlyYears.length) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = 'Tiada tahun';
+      yearlyYearSelect.appendChild(opt);
+      return;
+    }
+    yearlyYears.forEach(y => {
+      const opt = document.createElement('option');
+      opt.value = y;
+      opt.textContent = y;
+      yearlyYearSelect.appendChild(opt);
+    });
+  }
+
+  function renderYearly(year) {
+    yearlyTableBody.innerHTML = '';
+    if (!year) {
+      yearlyInfo.textContent = 'Tiada rekod kehadiran untuk tahun ini.';
+      return;
+    }
+    const monthlyPresent = new Array(12).fill(0);
+    const monthlyTotal = new Array(12).fill(0);
+
+    Object.keys(yearlyRaw).forEach(dateKey => {
+      if (dateKey.slice(0,4) !== year) return;
+      const mIdx = parseInt(dateKey.slice(5,7),10) - 1;
+      if (mIdx < 0 || mIdx > 11) return;
+      const dayData = yearlyRaw[dateKey] || {};
+      Object.values(dayData).forEach(rec => {
+        if (!rec || typeof rec.present !== 'number' || typeof rec.total !== 'number') return;
+        monthlyPresent[mIdx] += rec.present;
+        monthlyTotal[mIdx] += rec.total;
+      });
+    });
+
+    let anyData = false;
+    let bil = 1;
+    for (let i = 0; i < 12; i++) {
+      const present = monthlyPresent[i];
+      const total = monthlyTotal[i];
+      if (total > 0) anyData = true;
+
+      const tr = document.createElement('tr');
+      const c1 = document.createElement('td'); c1.textContent = bil++;
+      const c2 = document.createElement('td'); c2.textContent = MONTH_NAMES_MS[i];
+      const c3 = document.createElement('td');
+
+      if (total > 0) {
+        const pct = (present / total) * 100;
+        c3.textContent = present + "/" + total + " (" + pct.toFixed(1) + "%)";
+      } else {
+        c3.textContent = '-';
+        c3.style.color = '#9ca3af';
+      }
+
+      tr.appendChild(c1); tr.appendChild(c2); tr.appendChild(c3);
+      yearlyTableBody.appendChild(tr);
+    }
+
+    yearlyInfo.textContent = anyData
+      ? 'Ringkasan kehadiran bagi tahun ' + year + '. "-" bermaksud tiada rekod kehadiran untuk bulan tersebut.'
+      : 'Tiada rekod kehadiran untuk tahun ini.';
+  }
+
+  function initYearlySummary() {
+    ensureYearlyData().then(() => {
+      populateYearlyYearOptions();
+      let defaultYear = String(currentYear);
+      if (!yearlyYears.includes(defaultYear) && yearlyYears.length) {
+        defaultYear = yearlyYears[0];
+      }
+      yearlyYearSelect.value = defaultYear;
+      renderYearly(yearlyYearSelect.value);
+      yearlyInitialised = true;
+    });
+  }
+
+  if (yearlyYearSelect) {
+    yearlyYearSelect.addEventListener('change', () => {
+      if (!yearlyRaw) return;
+      renderYearly(yearlyYearSelect.value);
+    });
+  }
+
   // -------- Admin: paparan senarai kelas & murid --------
 
   function renderAdminClassTable() {
@@ -1169,9 +1316,55 @@
       tr.appendChild(makeCell(code));
       tr.appendChild(makeCell(cfg.kelasLabel));
       tr.appendChild(makeCell(list.length));
+
+      const actionTd = document.createElement('td');
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.textContent = 'Padam';
+      delBtn.className = 'btn btn-secondary admin-delete-class';
+      delBtn.style.padding = '4px 10px';
+      delBtn.style.fontSize = '.8rem';
+      delBtn.dataset.code = code;
+      actionTd.appendChild(delBtn);
+      tr.appendChild(actionTd);
+
       adminClassTableBody.appendChild(tr);
     });
   }
+
+  // Padam kelas (event delegation)
+  adminClassTableBody.addEventListener('click', (e) => {
+    const btn = e.target.closest('.admin-delete-class');
+    if (!btn) return;
+    const code = btn.dataset.code;
+    if (!code) return;
+
+    const cfgIndex = summaryConfig.findIndex(c => c.code === code);
+    const confirmMsg = 'Padam kelas ' + code + ' daripada konfigurasi?\n' +
+      'Rekod kehadiran lama untuk kod ini masih kekal dalam pangkalan data.';
+    if (!confirm(confirmMsg)) return;
+
+    if (cfgIndex !== -1) {
+      summaryConfig.splice(cfgIndex, 1);
+    }
+    if (classData[code]) {
+      delete classData[code];
+    }
+
+    saveClassConfigToDB();
+    renderAdminClassTable();
+    populateClassDropdown();
+    populateAdminClassSelect();
+
+    if (classSelect.value === code) {
+      classSelect.value = '';
+      studentsSection.style.display = 'none';
+      summaryBox.style.display = 'none';
+    }
+
+    adminClassMsg.textContent = 'Kelas ' + code + ' telah dipadam daripada konfigurasi.';
+    adminClassMsg.style.color = '#b91c1c';
+  });
 
   function populateAdminClassSelect() {
     if (!adminStudentClassSelect) return;
@@ -1193,6 +1386,7 @@
       const found = Array.from(adminStudentClassSelect.options).some(o => o.value === prev);
       if (found) adminStudentClassSelect.value = prev;
     }
+    loadAdminStudentsForClass();
   }
 
   function loadAdminStudentsForClass() {
